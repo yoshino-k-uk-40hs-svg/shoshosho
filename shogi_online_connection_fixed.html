@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>オンライン将棋 改良版</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;min-height:100vh;color:#302318;
+ font-family:"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif;
+ background:
+   radial-gradient(circle at 20% 10%,#fff8e8aa 0 2px,transparent 3px),
+   radial-gradient(circle at 80% 30%,#8f6b4520 0 1px,transparent 2px),
+   repeating-linear-gradient(0deg,#d9c7a5 0,#d9c7a5 3px,#d5c19d 4px,#ddcba9 7px);
+}
+body:before{
+ content:"";position:fixed;inset:0;pointer-events:none;opacity:.2;
+ background:repeating-linear-gradient(90deg,transparent 0 17px,#765535 18px,transparent 19px 41px);
+}
+.app{width:min(1120px,100%);padding:28px 18px;position:relative}
+h1{
+ text-align:center;margin:0 0 22px;font-size:clamp(25px,4vw,42px);
+ letter-spacing:.22em;color:#3c2415;text-shadow:1px 2px 0 #f5e8c9;
+}
+h1:after{content:"";display:block;width:180px;height:2px;background:#73502e;margin:10px auto 0}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:22px}
+.panel{
+ background:linear-gradient(135deg,#f3e5c8,#e8d2aa);
+ border:1px solid #9a754b;border-radius:4px;
+ padding:16px;box-shadow:0 8px 25px #4b301d55;
+}
+.board-wrap{width:min(82vw,720px);margin:auto;padding:10px;background:#69401f;box-shadow:0 10px 22px #321b0e88}
+.board{
+ width:100%;aspect-ratio:1/1;display:grid;
+ grid-template-columns:repeat(9,minmax(0,1fr));
+ grid-template-rows:repeat(9,minmax(0,1fr));
+ border:3px solid #4a2913;
+ background:#c99b55;
+}
+.cell{
+ position:relative;min-width:0;min-height:0;
+ border:1px solid #795022;display:flex;align-items:center;justify-content:center;
+ background:
+  linear-gradient(135deg,#d6ad68,#c99a52);
+ padding:2px;
+}
+.cell:nth-child(3n){background:linear-gradient(135deg,#d9b06b,#cda05a)}
+.cell.selected{background:#e6c982}
+.cell.last{box-shadow:inset 0 0 0 3px #9b3e25}
+.piece{
+ width:82%;height:89%;display:flex;align-items:center;justify-content:center;
+ clip-path:polygon(50% 0%,93% 15%,82% 100%,18% 100%,7% 15%);
+ background:
+   radial-gradient(ellipse at 35% 25%,#f7dda0 0 13%,transparent 38%),
+   linear-gradient(135deg,#f1d18b,#b97932);
+ filter:drop-shadow(2px 3px 2px #3a210e99);
+ color:#24170d;
+ font-family:"Yu Mincho","Hiragino Mincho ProN",serif;
+ font-weight:900;font-size:clamp(16px,3.1vw,31px);line-height:1;
+ user-select:none;cursor:pointer;position:relative;
+ text-shadow:.5px .5px 0 #f3d99a;
+}
+.piece:before{
+ content:"";position:absolute;inset:5% 9%;
+ clip-path:polygon(50% 0%,93% 15%,82% 100%,18% 100%,7% 15%);
+ box-shadow:inset 0 0 5px #6b401e;
+ pointer-events:none;
+}
+.piece.gote{transform:rotate(180deg)}
+.piece.promoted{color:#9e241d}
+.hand-title{
+ font-weight:bold;letter-spacing:.08em;margin-top:6px;
+ border-bottom:1px solid #9c7447;padding-bottom:4px
+}
+.hand{min-height:48px;display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 15px}
+.hand button,.controls button{
+ border:1px solid #76502e;border-radius:3px;padding:9px 11px;
+ background:linear-gradient(#f1d49b,#c28b45);
+ color:#2d1c10;font-family:inherit;font-weight:bold;cursor:pointer;
+ box-shadow:0 2px 3px #5b371e55
+}
+.hand button:hover,.controls button:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.info{line-height:1.7;font-size:14px}
+.status{
+ padding:11px;background:#4b2c19;color:#f8e8c5;border-radius:3px;
+ margin-bottom:14px;text-align:center;font-weight:bold;letter-spacing:.1em
+}
+.controls{display:grid;gap:8px;margin-top:15px}
+.room{display:flex;gap:7px;margin-top:7px}
+.room input{min-width:0;flex:1;border:1px solid #98704a;border-radius:3px;padding:9px;background:#fff9eb;font-family:inherit}
+hr{border:0;border-top:1px solid #a47d51;margin:18px 0}
+small{opacity:.72}
+@media(max-width:800px){.layout{grid-template-columns:1fr}.board-wrap{width:min(94vw,650px)}}
+.online-ui{position:fixed;top:14px;right:14px;z-index:9999;width:260px;padding:11px 12px;background:rgba(48,30,18,.96);color:#f7e8c7;border:1px solid #b28a56;border-radius:6px;box-shadow:0 6px 18px #0007;font-family:"Yu Mincho","Noto Serif JP",serif}.online-ui .row{display:flex;gap:6px;margin-top:7px}.online-ui input{flex:1;min-width:0;padding:7px;border-radius:3px;border:1px solid #9b754b}.online-ui button{padding:7px 10px;border:1px solid #a37a49;border-radius:3px;background:#d1a25b;color:#24170d;font-weight:bold}.online-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#a33;margin-right:6px}.online-dot.on{background:#61b35b}@media(max-width:650px){.online-ui{width:220px;top:8px;right:8px}}
+</style>
+</head>
+<body><div class="online-ui"><div><span id="onlineDot" class="online-dot"></span><b id="onlineStatus">サーバー未接続</b></div><div class="row"><input id="onlineRoom" placeholder="ルームコード"><button onclick="connectOnline()">接続</button></div><div style="margin-top:6px;font-size:12px">ルーム: <b id="onlineRoomName">---</b>　人数: <b id="onlinePlayers">0</b>/2</div></div>
+<div class="app">
+<h1>オンライン将棋</h1>
+<div class="layout">
+  <section class="panel">
+    <div class="board-wrap"><div id="board" class="board"></div></div>
+  </section>
+
+  <aside class="panel">
+    <div class="status" id="status">先手の手番</div>
+    <b>先手の持ち駒</b><div id="senteHand" class="hand"></div>
+    <b>後手の持ち駒</b><div id="goteHand" class="hand"></div>
+
+    <div class="controls">
+      <button onclick="newGame()">新しい対局</button>
+      <button onclick="resign()">投了</button>
+    </div>
+
+    <hr>
+    <div class="info">
+      <b>オンライン対戦</b>
+      <div class="room">
+        <input id="room" placeholder="ルームコード">
+        <button onclick="joinRoom()">参加</button>
+      </div>
+      <small>現在はUI・将棋ルール部分のプロトタイプです。</small>
+    </div>
+  </aside>
+</div>
+</div>
+
+<script>
+const init=[
+ ["l","n","s","g","k","g","s","n","l"],
+ [null,"r",null,null,null,null,null,"b",null],
+ ["p","p","p","p","p","p","p","p","p"],
+ [null,null,null,null,null,null,null,null,null],
+ [null,null,null,null,null,null,null,null,null],
+ [null,null,null,null,null,null,null,null,null],
+ ["P","P","P","P","P","P","P","P","P"],
+ [null,"B",null,null,null,null,null,"R",null],
+ ["L","N","S","G","K","G","S","N","L"]
+];
+
+const names={K:"玉",R:"飛",B:"角",G:"金",S:"銀",N:"桂",L:"香",P:"歩"};
+const promoted={R:"龍",B:"馬",S:"全",N:"圭",L:"杏",P:"と"};
+let board=[],turn="sente",selected=null,lastMove=null;
+let hands={sente:{P:0,L:0,N:0,S:0,G:0,B:0,R:0},gote:{P:0,L:0,N:0,S:0,G:0,B:0,R:0}};
+
+let socket=null;
+let roomCode="";
+let reconnectTimer=null;
+let heartbeatTimer=null;
+let manualDisconnect=false;
+let gameFinished=false;
+
+function setOnline(ok,t){
+  document.getElementById("onlineDot").classList.toggle("on",ok);
+  document.getElementById("onlineStatus").textContent=t;
+}
+
+function stopHeartbeat(){
+  if(heartbeatTimer){clearInterval(heartbeatTimer);heartbeatTimer=null;}
+}
+
+function startHeartbeat(){
+  stopHeartbeat();
+  heartbeatTimer=setInterval(()=>{
+    if(socket && socket.readyState===WebSocket.OPEN){
+      try{socket.send(JSON.stringify({type:"ping"}));}catch(e){}
+    }
+  },15000);
+}
+
+function scheduleReconnect(){
+  if(manualDisconnect || gameFinished || !roomCode || reconnectTimer)return;
+  setOnline(false,"再接続中…");
+  reconnectTimer=setTimeout(()=>{
+    reconnectTimer=null;
+    connectOnline(true);
+  },1500);
+}
+
+function connectOnline(isReconnect=false){
+  const input=document.getElementById("onlineRoom");
+  const room=(isReconnect?roomCode:input.value.trim().toUpperCase());
+  if(!room){
+    alert("ルームコードを入力してください。");
+    return;
+  }
+  roomCode=room;
+  manualDisconnect=false;
+  gameFinished=false;
+
+  if(socket){
+    try{socket.onclose=null;socket.close();}catch(e){}
+  }
+
+  const proto=location.protocol==="https:"?"wss":"ws";
+  const url=proto+"://"+location.host+"/?room="+encodeURIComponent(roomCode);
+  socket=new WebSocket(url);
+  document.getElementById("onlineRoomName").textContent=roomCode;
+  setOnline(false,isReconnect?"再接続中…":"接続中…");
+
+  socket.onopen=()=>{
+    setOnline(true,"オンライン接続中");
+    startHeartbeat();
+    syncOnline();
+  };
+
+  socket.onmessage=e=>{
+    let m;
+    try{m=JSON.parse(e.data);}catch(err){return;}
+    if(m.type==="pong")return;
+    if(m.type==="room"){
+      document.getElementById("onlinePlayers").textContent=m.players;
+      if(m.players>0)setOnline(true,"オンライン接続中");
+      return;
+    }
+    if(m.type==="state"){
+      board=m.board;turn=m.turn;hands=m.hands;lastMove=m.lastMove||null;
+      selected=null;render();
+      return;
+    }
+    if(m.type==="gameOver"){
+      gameFinished=true;
+      setOnline(true,"対局終了");
+      return;
+    }
+    if(m.type==="error"){
+      alert(m.message);
+      manualDisconnect=true;
+    }
+  };
+
+  socket.onerror=()=>{
+    setOnline(false,"接続が不安定です。再接続中…");
+  };
+
+  socket.onclose=()=>{
+    stopHeartbeat();
+    document.getElementById("onlinePlayers").textContent="0";
+    if(!manualDisconnect && !gameFinished) scheduleReconnect();
+    else setOnline(false,gameFinished?"対局終了":"サーバー未接続");
+  };
+}
+
+function syncOnline(){
+  if(socket && socket.readyState===WebSocket.OPEN){
+    try{
+      socket.send(JSON.stringify({type:"state",board,turn,hands,lastMove}));
+    }catch(e){
+      scheduleReconnect();
+    }
+  }
+}
+function newGame(){
+  board=init.map(r=>r.slice());
+  turn="sente";selected=null;lastMove=null;
+  hands={sente:{P:0,L:0,N:0,S:0,G:0,B:0,R:0},gote:{P:0,L:0,N:0,S:0,G:0,B:0,R:0}};
+  render();
+}
+function side(p){return p&&p===p.toUpperCase()?"sente":"gote"}
+function base(p){return p.toUpperCase()}
+function disp(p){
+  if(!p)return "";
+  let b=base(p);
+  return p===p.toUpperCase()?names[b]:names[b];
+}
+function isPromoted(p){return p && p===p.toLowerCase() ? false : false}
+/* 内部では成駒を +R のように保持 */
+function label(p){
+  if(!p)return "";
+  let prom=p[0]==="+";
+  let b=base(prom?p.slice(1):p);
+  return prom?promoted[b]:names[b];
+}
+function owner(p){return p&&((p[0]==="+")?side(p.slice(1)):side(p))}
+function makePiece(b,s,prom=false){
+  let p=s==="sente"?b:b.toLowerCase();
+  return prom?"+"+p:p;
+}
+function render(){
+  const el=document.getElementById("board");el.innerHTML="";
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+    const cell=document.createElement("div");cell.className="cell";
+    if(selected&&selected.r===r&&selected.c===c)cell.classList.add("selected");
+    if(lastMove&&((lastMove.a.r===r&&lastMove.a.c===c)||(lastMove.b.r===r&&lastMove.b.c===c)))cell.classList.add("last");
+    cell.onclick=()=>clickCell(r,c);
+    const p=board[r][c];
+    if(p){
+      const q=document.createElement("div");
+      q.className="piece "+(owner(p)==="gote"?"gote ":"")+(p[0]==="+"?"promoted":"");
+      q.textContent=label(p);
+      cell.appendChild(q);
+    }
+    el.appendChild(cell);
+  }
+  drawHand("sente","senteHand");drawHand("gote","goteHand");
+  document.getElementById("status").textContent=turn==="sente"?"先手の手番":"後手の手番";
+}
+function drawHand(s,id){
+  const el=document.getElementById(id);el.innerHTML="";
+  for(const b of Object.keys(hands[s])){
+    if(!hands[s][b])continue;
+    const btn=document.createElement("button");
+    btn.textContent=names[b]+" × "+hands[s][b];
+    btn.onclick=()=>alert("持ち駒を盤に打つ処理は次のオンライン版で実装できます。");
+    el.appendChild(btn);
+  }
+}
+function clickCell(r,c){
+  const p=board[r][c];
+  if(selected){
+    if(isLegal(selected.r,selected.c,r,c)){
+      movePiece(selected.r,selected.c,r,c);
+      selected=null;
+      turn=turn==="sente"?"gote":"sente";
+      render();syncOnline();return;
+    }
+    if(p&&owner(p)===turn){selected={r,c};render();return}
+    selected=null;render();return;
+  }
+  if(p&&owner(p)===turn){selected={r,c};render()}
+}
+function movePiece(ar,ac,br,bc){
+  playWoodSound();
+  let p=board[ar][ac],capt=board[br][bc];
+  if(capt){
+    let b=base(capt[0]==="+"?capt.slice(1):capt);
+    hands[turn][b]++;
+  }
+  let b=base(p[0]==="+"?p.slice(1):p);
+  let promote=p[0]==="+"||canPromote(p,br);
+  board[br][bc]=makePiece(b,turn,promote);
+  board[ar][ac]=null;
+  lastMove={a:{r:ar,c:ac},b:{r:br,c:bc}};
+}
+function canPromote(p,r){
+  const b=base(p[0]==="+"?p.slice(1):p);
+  return ["P","L","N","S","B","R"].includes(b) &&
+    (turn==="sente"?r<=2:r>=6);
+}
+function inBoard(r,c){return r>=0&&r<9&&c>=0&&c<9}
+function isLegal(ar,ac,br,bc){
+  if(!inBoard(br,bc))return false;
+  const p=board[ar][ac], target=board[br][bc];
+  if(!p||owner(p)!==turn||(target&&owner(target)===turn))return false;
+  const s=turn==="sente"?1:-1, dr=br-ar,dc=bc-ac;
+  const b=base(p[0]==="+"?p.slice(1):p),pr=p[0]==="+";
+  if(b==="P")return pr?slide(dr,dc,1,0,s):dr===-s&&dc===0;
+  if(b==="L")return pr?slide(dr,dc,1,0,s):slide(dr,dc,1,0,s);
+  if(b==="N")return pr?goldLike(dr,dc,s):dr===-2*s&&Math.abs(dc)===1;
+  if(b==="S")return pr?goldLike(dr,dc,s):Math.abs(dr)===1&&Math.abs(dc)<=1&&!(dr===s&&dc===0);
+  if(b==="G"||pr&&["P","L","N","S"].includes(b))return goldLike(dr,dc,s);
+  if(b==="K")return Math.max(Math.abs(dr),Math.abs(dc))===1;
+  if(b==="R")return pr?(slide(dr,dc,1,0,s)||slide(dr,dc,0,1,s)||Math.max(Math.abs(dr),Math.abs(dc))===1):slide(dr,dc,1,0,s)||slide(dr,dc,0,1,s);
+  if(b==="B")return pr?(slide(dr,dc,1,1,s)||slide(dr,dc,1,-1,s)||Math.max(Math.abs(dr),Math.abs(dc))===1):slide(dr,dc,1,1,s)||slide(dr,dc,1,-1,s);
+  return false;
+}
+function goldLike(dr,dc,s){return (dr===-s&&Math.abs(dc)<=1)||(dr===0&&Math.abs(dc)===1)||(dr===s&&dc===0)}
+function slide(dr,dc,rr,cc,s){
+  if(rr===1&&cc===1){
+    if(Math.abs(dr)!==Math.abs(dc)||dr===0)return false;
+  }else if(rr===1&&cc===0){
+    if(dc!==0||dr===0)return false;
+  }else if(rr===0&&cc===1){
+    if(dr!==0||dc===0)return false;
+  }
+  const sr=Math.sign(dr),sc=Math.sign(dc),steps=Math.max(Math.abs(dr),Math.abs(dc));
+  const ar0=selected.r, ac0=selected.c;
+  for(let i=1;i<steps;i++){
+    if(board[ar0+sr*i][ac0+sc*i]) return false;
+  }
+  return true;
+}
+function playWoodSound(){
+  try{
+    const C=window.AudioContext||window.webkitAudioContext;
+    const ctx=new C(),o=ctx.createOscillator(),g=ctx.createGain();
+    o.type="triangle";o.frequency.setValueAtTime(150,ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(75,ctx.currentTime+.07);
+    g.gain.setValueAtTime(.0001,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.08,ctx.currentTime+.005);
+    g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.09);
+    o.connect(g).connect(ctx.destination);o.start();o.stop(ctx.currentTime+.1);
+  }catch(e){}
+}
+function resign(){
+  gameFinished=true;
+  if(socket&&socket.readyState===WebSocket.OPEN){
+    try{socket.send(JSON.stringify({type:"gameOver",reason:(turn==="sente"?"先手":"後手")+"が投了しました。"}));}catch(e){}
+  }
+  alert((turn==="sente"?"先手":"後手")+"が投了しました。");
+  setOnline(true,"対局終了");
+  newGame();
+}
+function joinRoom(){
+  const code=document.getElementById("room").value.trim();
+  if(code)alert("ルーム「"+code+"」に接続するUIです。実際のオンライン通信にはサーバー接続が必要です。");
+}
+newGame();
+</script>
+</body>
+</html>
